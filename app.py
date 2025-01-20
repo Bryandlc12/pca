@@ -1,18 +1,32 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
+import os
+from flask import Flask, render_template, request
+from werkzeug.utils import secure_filename
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-import os
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = '/uploads'
+app.config['ALLOWED_EXTENSIONS'] = {'csv'}
+# Asegúrate de que la carpeta uploads esté dentro del directorio del proyecto
+app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
 
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# Verifica si la carpeta 'uploads' existe, si no, la crea
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@app.route('/')
+# Asegurarse de que la carpeta de subida exista
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+@app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
@@ -22,51 +36,77 @@ def upload_file():
         return "No se subió ningún archivo", 400
     
     file = request.files['file']
+    
     if file.filename == '':
         return "El archivo está vacío", 400
     
-    # Guardar el archivo subido
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
-
-    # Leer el archivo como DataFrame
-    try:
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # Leer archivo CSV
         df = pd.read_csv(filepath)
-    except Exception as e:
-        return f"Error al leer el archivo: {e}", 400
+        
+        # Preprocesamiento de datos
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(df.select_dtypes(include=[np.number]))  # Solo columnas numéricas
+        
+        # PCA
+        pca = PCA()
+        principal_components = pca.fit_transform(scaled_data)
 
-    # Verificar si hay suficientes columnas
-    if df.shape[1] < 2:
-        return "El archivo debe tener al menos dos columnas para realizar PCA", 400
+        # Graficar Scree Plot
+        plt.figure(figsize=(8, 6))
+        plt.plot(np.arange(1, len(pca.explained_variance_ratio_) + 1), pca.explained_variance_ratio_, marker='o')
+        plt.title('Scree Plot')
+        plt.xlabel('Componentes principales')
+        plt.ylabel('Varianza explicada')
+        scree_plot_path = 'static/images/scree_plot.png'
+        plt.savefig(scree_plot_path)
+        plt.close()
 
-    # Filtrar solo columnas numéricas
-    df_numeric = df.select_dtypes(include=['number'])
+        # Graficar PCA Scatter Plot (PC1 vs PC2)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(principal_components[:, 0], principal_components[:, 1], c='blue', edgecolors='k')
+        plt.title('PCA: Componentes Principales')
+        plt.xlabel('PC1')
+        plt.ylabel('PC2')
+        pca_scatter_path = 'static/images/pca_scatter.png'
+        plt.savefig(pca_scatter_path)
+        plt.close()
 
-    # Verificar que haya suficientes columnas numéricas
-    if df_numeric.shape[1] < 2:
-        return "El archivo debe tener al menos dos columnas numéricas para realizar PCA", 400
+        # Graficar Loading Plot
+        loadings = pca.components_.T
+        plt.figure(figsize=(8, 6))
+        plt.scatter(loadings[:, 0], loadings[:, 1], edgecolors='r')
+        plt.title('Loading Plot')
+        plt.xlabel('PC1')
+        plt.ylabel('PC2')
+        loading_plot_path = 'static/images/loading_plot.png'
+        plt.savefig(loading_plot_path)
+        plt.close()
 
-    # Estandarizar los datos
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(df_numeric)
+        # Graficar Biplot
+        plt.figure(figsize=(8, 6))
+        plt.scatter(principal_components[:, 0], principal_components[:, 1], c='blue', edgecolors='k')
+        for i in range(loadings.shape[0]):
+            plt.arrow(0, 0, loadings[i, 0], loadings[i, 1], color='r', alpha=0.5)
+            plt.text(loadings[i, 0] * 1.15, loadings[i, 1] * 1.15, df.columns[i], color='r', ha='center', va='center')
+        plt.title('Biplot de PCA')
+        plt.xlabel('PC1')
+        plt.ylabel('PC2')
+        biplot_path = 'static/images/biplot.png'
+        plt.savefig(biplot_path)
+        plt.close()
 
-    # Aplicar PCA
-    pca = PCA(n_components=min(2, df_numeric.shape[1]))
-    principal_components = pca.fit_transform(scaled_data)
+        return render_template('index.html', 
+                               scree_plot=scree_plot_path, 
+                               pca_scatter=pca_scatter_path, 
+                               loading_plot=loading_plot_path, 
+                               biplot=biplot_path)
 
-    # Crear un nuevo DataFrame con los componentes principales
-    pca_df = pd.DataFrame(principal_components, columns=[f'PC{i+1}' for i in range(principal_components.shape[1])])
+    return "El archivo no es válido", 400
 
-    # Guardar los resultados en un archivo CSV
-    output_path = os.path.join(app.config['UPLOAD_FOLDER'], 'pca_result.csv')
-    pca_df.to_csv(output_path, index=False)
-
-    return redirect(url_for('download_file', filename='pca_result.csv'))
-
-
-@app.route('/download/<filename>')
-def download_file(filename):
-    return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename), as_attachment=True)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
