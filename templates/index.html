@@ -3,27 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reduccion de un dataset</title>
+    <title>Reducción de un Dataset</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <header>
-        <h1>Reduccion del Dataset</h1>
+        <h1>Reducción del Dataset con PCA</h1>
     </header>
-
     <main class="container">
-        <!-- Sección de subir imagen -->
+        <!-- Sección de subir archivo -->
         <section class="upload-section">
             <h2>Sube un dataset</h2>
             <form action="/upload" method="POST" enctype="multipart/form-data">
                 <label for="file">Archivo CSV:</label>
                 <input type="file" name="file" id="file" accept=".csv" required>
                 <button type="submit">Procesar</button>
+            </form>
         </section>
 
+        <!-- Sección de imágenes generadas -->
+        {% if scree_plot %}
+        <section class="result-section">
+            <h2>Gráficas de PCA</h2>
+            <div>
+                <h3>Scree Plot</h3>
+                <img src="{{ url_for('static', filename='images/scree_plot.png') }}" alt="Scree Plot">
+            </div>
+            <div>
+                <h3>PCA Scatter Plot</h3>
+                <img src="{{ url_for('static', filename='images/pca_scatter.png') }}" alt="PCA Scatter Plot">
+            </div>
+            <div>
+                <h3>Loading Plot</h3>
+                <img src="{{ url_for('static', filename='images/loading_plot.png') }}" alt="Loading Plot">
+            </div>
+            <div>
+                <h3>Biplot</h3>
+                <img src="{{ url_for('static', filename='images/biplot.png') }}" alt="Biplot">
+            </div>
+        </section>
+        {% else %}
+        <p>No se generaron imágenes todavía.</p>
+        {% endif %}
     </main>
-
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
