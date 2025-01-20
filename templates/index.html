@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reduccion de un dataset</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <header>
+        <h1>Reduccion del Dataset</h1>
+    </header>
+
+    <main class="container">
+        <!-- Sección de subir imagen -->
+        <section class="upload-section">
+            <h2>Sube un dataset</h2>
+            <form action="/upload" method="POST" enctype="multipart/form-data">
+                <label for="file">Archivo CSV:</label>
+                <input type="file" name="file" id="file" accept=".csv" required>
+                <button type="submit">Procesar</button>
+        </section>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
